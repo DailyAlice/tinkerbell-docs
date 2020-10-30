@@ -1,21 +1,72 @@
 ---
 title: Hardware Data
-date: 2019-01-04
+date: 2020-07-29
 ---
 
 # Hardware Data
 
-- Hardware data holds the details about the hardware that you wish to use with a workflow.
-- A hardware may have multiple network devices that can be used in a worklfow.
-- The details about all those devices is maintained in JSON format as hardware data.
+Tinkerbell uses hardware data to identify the hardware targeted by a Workflow. Typically, it will be used to describe the hardware of a Worker, and can include network interfaces, storage disks, and file systems. Hardware data is JSON formatted, and stored on the Provisioner in PostgreSQL.
 
-## Example
+While the hardware data is essential, not all the properties are required for every Worker or workflow. Hardware data is intended to be of use to the developer/hardware owner instead of a rigid, explicit definition in service of Tinkerbell. You can include more data in hardware data than is touched by your workflow; it can be as detailed as is useful to you.
 
-If you have a hardware that has a single network/worker device on it, its hardware data shall be structured like the following:
+## A Minimal Hardware Data Example
+
+While not all fields are required in hardware data, there are some requirements in content and structure. When creating hardware data, it might be useful to start with the minimal data given below and add the properties you would want to use in your workflow. Be sure to change the values of the fields to match your environment.
 
 ```json
 {
   "id": "0eba0bf8-3772-4b4a-ab9f-6ebe93b90a94",
+  "metadata": {
+    "facility": {
+      "facility_code": "onprem"
+    },
+    "instance": {},
+    "state": ""
+  },
+  "network": {
+    "interfaces": [
+      {
+        "dhcp": {
+          "arch": "x86_64",
+          "ip": {
+            "address": "192.168.1.5",
+            "gateway": "192.168.1.1",
+            "netmask": "255.255.255.248"
+          },
+          "mac": "00:00:00:00:00:00",
+          "uefi": false
+        },
+        "netboot": {
+          "allow_pxe": true,
+          "allow_workflow": true
+        }
+      }
+    ]
+  }
+}
+```
+A few details on the fields:
+ 
+- The `id` field is a unique UUID that you provide to identify this specific hardware data. It is the only required field.
+- The `network.interfaces[].netboot.allow_workflow` is set to true to allow your Worker boot into workflow mode.
+- The `network.interfaces[].dhcp.ip.address` is the IP Address that Boots will give to your Worker, and it can also be used to identify the hardware data in the database. A Worker machine can be identified by either IP Address or MAC Address at workflow creation and boot up.
+- The `network.interfaces[].dhcp.mac` is the MAC Address for your Worker, and can used to identify the hardware data in the database. A Worker machine can be identified by either IP Address or MAC Address at workflow creation and boot up.
+
+## Hardware Data CLI Commands
+ 
+Hardware data is pushed to the database on the Provisioner with the [`tink hardware push`](/cli-reference/hardware/#tink-hardware-push) command, and deleted with [`tink hardware delete`](/cli-reference/hardware/#tink-hardware-delete).
+
+Hardware data can be retrieved by ID, IP address, or MAC address with [`tink hardware id`](/cli-reference/hardware/#tink-hardware-id), [`tink hardware ip`](/cli-reference/hardware/#tink-hardware-ip), and [`tink hardware mac`](/cli-reference/hardware/#tink-hardware-mac), respectively. You can retrieve all hardware data in the database with [`tink hardware all`](/cli-reference/hardware/#tink-hardware-all).
+
+A complete list of CLI commands and examples is in the [CLI Reference](/cli-reference/hardware/).
+
+## A Robust Hardware Data Example
+
+This example hardware data describes a Worker with a single network device on it, that lives in a Packet facility, and has many fields that might be used as part of an inventory management system.
+
+```json
+{
+  "id": "58b0184c-1ba5-41d3-baec-5e453b2de717",
   "metadata": {
     "bonding_mode": 5,
     "custom": {
@@ -124,103 +175,7 @@ If you have a hardware that has a single network/worker device on it, its hardwa
 }
 ```
 
-## Property Description
+A few details on some of the notable fields included in the above example:
 
-The following section explains each property in the above example:
-
-| Property                                                     | Description                                                                                                                                                                                                                                                                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| id                                                           | A UUID used to uniquely identify the hardware. The `id` can be generated using the `uuidgen` command. If you are in Packet environment, you can get the `id` from the server overview page.                                                                                                 |
-| network                                                      | Network details                                                                                                                                                                                                                                                                             |
-| network.Interfaces[]                                         | List of network interfaces on the hardware                                                                                                                                                                                                                                                  |
-| network.interfaces[].dhcp                                    | DHCP details                                                                                                                                                                                                                                                                                |
-| network.interfaces[].dhcp.mac                                | MAC address of the network device (worker)                                                                                                                                                                                                                                                  |
-| network.interfaces[].dhcp.ip                                 | IP details for DHCP                                                                                                                                                                                                                                                                         |
-| network.interfaces[].dhcp.ip.address                         | Worker IP address to be requested over DHCP                                                                                                                                                                                                                                                 |
-| network.interfaces[].dhcp.ip.gateway                         | Gateway address                                                                                                                                                                                                                                                                             |
-| network.interfaces[].dhcp.ip.netmask                         | Netmask for the private network                                                                                                                                                                                                                                                             |
-| network.interfaces[].dhcp.hostname                           | Hostname                                                                                                                                                                                                                                                                                    |
-| network.interfaces[].dhcp.lease_time                         | Expiration in secs (default: 86400)                                                                                                                                                                                                                                                         |
-| network.interfaces[].dhcp.name_servers[]                     | DNS servers                                                                                                                                                                                                                                                                                 |
-| network.interfaces[].dhcp.time_servers[]                     | NTP servers                                                                                                                                                                                                                                                                                 |
-| network.interfaces[].dhcp.arch                               | Hardware architecture, example: `x86_64`                                                                                                                                                                                                                                                    |
-| network.interfaces[].dhcp.uefi                               | Is UEFI                                                                                                                                                                                                                                                                                     |
-| network.interfaces[].netboot                                 | Netboot details                                                                                                                                                                                                                                                                             |
-| network.interfaces[].netboot.allow_pxe                       | Must be set to `true` to PXE.                                                                                                                                                                                                                                                               |
-| network.interfaces[].netboot.allow_workflow                  | Must be `true` in order to execute a workflow.                                                                                                                                                                                                                                              |
-| network.interfaces[].netboot.ipxe                            | Details for iPXE                                                                                                                                                                                                                                                                            |
-| network.interfaces[].netboot.ipxe.url                        | iPXE script URL                                                                                                                                                                                                                                                                             |
-| network.interfaces[].netboot.ipxe.contents                   | iPXE script contents                                                                                                                                                                                                                                                                        |
-| network.interfaces[].netboot.osie                            | OSIE details                                                                                                                                                                                                                                                                                |
-| network.interfaces[].netboot.osie.kernel                     | Kernel                                                                                                                                                                                                                                                                                      |
-| network.interfaces[].netboot.osie.initrd                     | Initrd                                                                                                                                                                                                                                                                                      |
-| network.interfaces[].netboot.osie.base_url                   | Base URL for the kernel and initrd                                                                                                                                                                                                                                                          |
-| metadata                                                     | Hardware metadata details                                                                                                                                                                                                                                                                   |
-| metadata.state                                               | State must be set to `provisioning` for workflows.                                                                                                                                                                                                                                          |
-| metadata.bonding_mode                                        | Bonding mode                                                                                                                                                                                                                                                                                |
-| metadata.manufacturer                                        | Manufacturer details                                                                                                                                                                                                                                                                        |
-| metadata.instance                                            | Holds the details for an instance                                                                                                                                                                                                                                                           |
-| metadata.instance.storage                                    | Details for an instance storage like disks and filesystems                                                                                                                                                                                                                                  |
-| metadata.instance.storage.disks                              | List of disk partitions                                                                                                                                                                                                                                                                     |
-| metadata.instance.storage.disks[].device                     | Name of the disk                                                                                                                                                                                                                                                                            |
-| metadata.instance.storage.disks[].wipe_table                 | Set to `true` to allow disk wipe.                                                                                                                                                                                                                                                           |
-| metadata.instance.storage.disks[].partitions                 | List of disk partitions                                                                                                                                                                                                                                                                     |
-| metadata.instance.storage.disks[].partitions[].size          | Size of the partition                                                                                                                                                                                                                                                                       |
-| metadata.instance.storage.disks[].partitions[].label         | Partition label like BIOS, SWAP or ROOT                                                                                                                                                                                                                                                     |
-| metadata.instance.storage.disks[].partitions[].number        | Partition number                                                                                                                                                                                                                                                                            |
-| metadata.instance.storage.filesystems                        | List of filesystems and their respective mount points                                                                                                                                                                                                                                       |
-| metadata.instance.storage.filesystems[].mount                | Details about the filesystem to be mounted                                                                                                                                                                                                                                                  |
-| metadata.instance.storage.filesystems[].mount.point          | Mount point for the filesystem                                                                                                                                                                                                                                                              |
-| metadata.instance.storage.filesystems[].mount.create         | Additional details that can be provided while creating a partition                                                                                                                                                                                                                          |
-| metadata.instance.storage.filesystems[].mount.create.options | Options to be passed to `mkfs` while creating a partition                                                                                                                                                                                                                                   |
-| metadata.instance.storage.filesystems[].mount.device         | Device to be mounted                                                                                                                                                                                                                                                                        |
-| metadata.instance.storage.filesystems[].mount.format         | Filesystem format                                                                                                                                                                                                                                                                           |
-| metadata.instance.crypted_root_password                      | Hash for root password that is used to login into the worker after provisioning. The hash can be generated using the `openssl passwd` command. For example, `openssl passwd -6 -salt xyz your-password`.                                                                                    |
-| metadata.operating_system_version                            | Details about the operating system to be installed                                                                                                                                                                                                                                          |
-| metadata.operating_system_version.distro                     | Operating system distribution name, like ubuntu                                                                                                                                                                                                                                             |
-| metadata.operating_system_version.version                    | Operating system version, like 18.04 or 20.04                                                                                                                                                                                                                                               |
-| metadata.operating_system_version.os_slug                    | A slug is a combination of operating system distro and version.                                                                                                                                                                                                                             |
-| metadata.facility                                            | Facility details                                                                                                                                                                                                                                                                            |
-| metadata.facility.plan_slug                                  | The slug for the worker class. The value for this property depends on how you setup your workflow. While it is required if you are using the OS images from [packet-images](https://github.com/packethost/packet-images) repository, it may be left out if not used at all in the workflow. |
-| metadata.facility.facility_code                              | For local setup, `onprem` or any other string value can be used.                                                                                                                                                                                                                            |
-
-## The Minimal Hardware Data
-
-While the hardware data is essential, not all the properties are required for every workflow.
-In fact, it's upto a workflow designer how they want to use the data in their workflow.
-Therefore, you may start with the minimal data given below and only add the properties you would want to use in your workflow.
-
-```json
-{
-  "id": "0eba0bf8-3772-4b4a-ab9f-6ebe93b90a94",
-  "metadata": {
-    "facility": {
-      "facility_code": "ewr1",
-      "plan_slug": "c2.medium.x86",
-      "plan_version_slug": ""
-    },
-    "instance": {},
-    "state": "provisioning"
-  },
-  "network": {
-    "interfaces": [
-      {
-        "dhcp": {
-          "arch": "x86_64",
-          "ip": {
-            "address": "192.168.1.5",
-            "gateway": "192.168.1.1",
-            "netmask": "255.255.255.248"
-          },
-          "mac": "00:00:00:00:00:00",
-          "uefi": false
-        },
-        "netboot": {
-          "allow_pxe": true,
-          "allow_workflow": true
-        }
-      }
-    ]
-  }
-}
-```
+- `metadata.instance.storage.disks[].wipe_table` is set to `true` to allow disk wipe.
+- `metadata.facility.plan_slug` is a slug for the worker class. The value for this property depends on how you setup your workflow. While it is required if you are using the OS images from [packet-images](https://github.com/packethost/packet-images) repository, it may be left out if not used at all in the workflow.
